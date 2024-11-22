@@ -1,21 +1,14 @@
-
 import { useDispatch, useSelector } from "react-redux";
-import {
-  addVehicleClicked,
-  // setEditData,
-} from "../../../redux/adminSlices/actions";
+import { addVehicleClicked } from "../../../redux/adminSlices/actions";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 
-import { MenuItem, } from "@mui/material";
+import { MenuItem } from "@mui/material";
 import { fetchModelData } from "../../admin/components/AddProductModal";
 import { useEffect } from "react";
 
 import Button from "@mui/material/Button";
-
-
-
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import { IoMdClose } from "react-icons/io";
@@ -23,134 +16,199 @@ import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 
-
 const VendorAddProductModal = () => {
-  const { register, handleSubmit, reset, control } = useForm();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    formState: { isSubmitting },
+  } = useForm({
+    defaultValues: {
+      company: "",
+      model: "",
+      fuelType: "",
+      carType: "",
+      Seats: "",
+      transmitionType: "",
+      vehicleLocation: "",
+      vehicleDistrict: "",
+      insurance_end_date: null,
+      Registeration_end_date: null,
+      polution_end_date: null,
+    },
+  });
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
   const { isAddVehicleClicked } = useSelector((state) => state.addVehicle);
   const { modelData, companyData, locationData, districtData } = useSelector(
-    (state) => state.modelDataSlice
+    (state) => state.modelDataSlice,
   );
   const { _id } = useSelector((state) => state.user.currentUser);
 
-
   useEffect(() => {
     fetchModelData(dispatch);
-  }, []);
+  }, [dispatch]);
 
-  const onSubmit = async (addData) => {
+  const onSubmit = async (data) => {
     try {
-      const img = [];
-      for (let i = 0; i < addData.image.length; i++) {
-        img.push(addData.image[i]);
-      }
       const formData = new FormData();
-      formData.append("registeration_number", addData.registeration_number);
-      formData.append("company", addData.company);
-      img.forEach((file) => {
-        formData.append(`image`, file); // Append each file with a unique key
-      });
-      formData.append("name", addData.name);
-      formData.append("model", addData.model);
-      formData.append("title", addData.title);
-      formData.append("base_package", addData.base_package);
-      formData.append("price", addData.price);
-      formData.append("description", addData.description);
-      formData.append("year_made", addData.year_made);
-      formData.append("fuel_type", addData.fuelType);
-      formData.append("seat", addData.Seats);
-      formData.append("transmition_type", addData.transmitionType);
-      formData.append("insurance_end_date", addData.insurance_end_date.$d);
-      formData.append("registeration_end_date", addData.Registeration_end_date.$d);
-      formData.append("polution_end_date", addData.polution_end_date.$d);
-      formData.append("car_type", addData.carType);
-      formData.append("location", addData.vehicleLocation);
-      formData.append("district", addData.vehicleDistrict);
-      formData.append("addedBy", _id); 
-      
 
-      let tostID;
-      if (formData) {
-        tostID = toast.loading("saving...", { position: "bottom-center" });
+      // Required fields – already validated by react-hook-form + required prop
+      formData.append(
+        "registeration_number",
+        data.registeration_number?.trim() || "",
+      );
+      formData.append("company", data.company);
+      formData.append("name", data.name?.trim() || "");
+      formData.append("model", data.model);
+      formData.append("title", data.title?.trim() || "");
+      formData.append("base_package", data.base_package?.trim() || "");
+      formData.append("price", data.price || "");
+      formData.append("description", data.description?.trim() || "");
+      formData.append("year_made", data.year_made || "");
+      formData.append("fuel_type", data.fuelType);
+      formData.append("seat", data.Seats);
+      formData.append("transmition_type", data.transmitionType);
+      formData.append("car_type", data.carType);
+      formData.append("location", data.vehicleLocation);
+      formData.append("district", data.vehicleDistrict);
+      formData.append("addedBy", _id);
+
+      // Dates – safe access
+      if (data.insurance_end_date?.$d) {
+        formData.append(
+          "insurance_end_date",
+          data.insurance_end_date.$d.toISOString(),
+        );
       }
+      if (data.Registeration_end_date?.$d) {
+        formData.append(
+          "registeration_end_date",
+          data.Registeration_end_date.$d.toISOString(),
+        );
+      }
+      if (data.polution_end_date?.$d) {
+        formData.append(
+          "polution_end_date",
+          data.polution_end_date.$d.toISOString(),
+        );
+      }
+
+      // Images – safe handling
+      if (data.image?.length > 0) {
+        Array.from(data.image).forEach((file) => {
+          formData.append("images", file); // ← changed key to "images[]" friendly name
+        });
+      }
+
+      // Optional document images
+      if (data.insurance_image?.length > 0) {
+        Array.from(data.insurance_image).forEach((file) =>
+          formData.append("insurance_images", file),
+        );
+      }
+      if (data.rc_book_image?.length > 0) {
+        Array.from(data.rc_book_image).forEach((file) =>
+          formData.append("rc_book_images", file),
+        );
+      }
+      if (data.polution_image?.length > 0) {
+        Array.from(data.polution_image).forEach((file) =>
+          formData.append("polution_images", file),
+        );
+      }
+
+      const toastId = toast.loading("Saving vehicle...", {
+        position: "bottom-center",
+      });
 
       const res = await fetch("/api/vendor/vendorAddVehicle", {
         method: "POST",
         body: formData,
       });
 
+      const result = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        toast.error("error");
-        toast.dismiss(tostID);
-      }
-      if (res.ok) {
-        toast.success("request send to admin");
-        toast.dismiss(tostID);
-        
+        toast.error(result.message || "Failed to submit vehicle", {
+          id: toastId,
+        });
+        return;
       }
 
+      toast.success("Request sent to admin", { id: toastId });
       reset();
-    } catch (error) {
-      console.log(error);
+      navigate("/vendorDashboard/vendorAllVeihcles");
+      dispatch(addVehicleClicked(false));
+    } catch (err) {
+      console.error("Vehicle submission error:", err);
+      toast.error("Something went wrong. Please try again.");
     }
+  };
+
+  const handleClose = () => {
+    reset();
     navigate("/vendorDashboard/vendorAllVeihcles");
     dispatch(addVehicleClicked(false));
   };
 
-  const handleClose = () => {
-    navigate("/vendorDashboard/vendorAllVeihcles");
-  };
+  if (!isAddVehicleClicked) return null;
 
   return (
     <>
       <Toaster />
-      {isAddVehicleClicked && (
-        <div>
-        <button onClick={handleClose} className="relative left-10 top-5">
-          <div className="padding-5 padding-2 rounded-full bg-slate-100 drop-shadow-md hover:shadow-lg hover:bg-blue-200 hover:translate-y-1 hover:translate-x-1 ">
-            <IoMdClose style={{ fontSize: "30" }} />
+      <div>
+        <button
+          onClick={handleClose}
+          className="relative left-10 top-5"
+          type="button"
+        >
+          <div className="p-2 rounded-full bg-slate-100 drop-shadow-md hover:shadow-lg hover:bg-blue-200 hover:translate-y-1 hover:translate-x-1 transition-transform">
+            <IoMdClose style={{ fontSize: 30 }} />
           </div>
         </button>
-        <form onSubmit={handleSubmit(onSubmit)}>
+
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="bg-white -z-10 max-w-[1000px] mx-auto">
             <Box
               sx={{
                 "& .MuiTextField-root": {
                   m: 4,
                   width: "25ch",
-                  color: "black", // Set text color to black
                   "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "black", // Set outline color to black
+                    borderColor: "black",
                   },
-                  "@media (max-width: 640px)": {
-                    width: "30ch",
-                  },
+                  "@media (max-width: 640px)": { width: "30ch" },
                 },
               }}
-              noValidate
-              autoComplete="off"
             >
               <div>
                 <TextField
                   required
                   id="registeration_number"
-                  label="registeration_number"
-                  {...register("registeration_number")}
+                  label="Registration Number"
+                  {...register("registeration_number", { required: true })}
                 />
 
                 <Controller
                   control={control}
                   name="company"
-                  render={({ field }) => (
+                  rules={{ required: "Company is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="company"
                       select
                       label="Company"
-                      error={Boolean(field.value == "")}
+                      error={!!error}
+                      helperText={error?.message}
                     >
+                      <MenuItem value="" disabled>
+                        Select company
+                      </MenuItem>
                       {companyData.map((cur, idx) => (
                         <MenuItem value={cur} key={idx}>
                           {cur}
@@ -158,27 +216,31 @@ const VendorAddProductModal = () => {
                       ))}
                     </TextField>
                   )}
-                ></Controller>
+                />
 
                 <TextField
                   required
                   id="name"
-                  label="name"
-                  {...register("name")}
+                  label="Name"
+                  {...register("name", { required: true })}
                 />
 
                 <Controller
                   control={control}
                   name="model"
-                  render={({ field }) => (
+                  rules={{ required: "Model is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="model"
                       select
                       label="Model"
-                      error={Boolean(field.value == "")}
+                      error={!!error}
+                      helperText={error?.message}
                     >
+                      <MenuItem value="" disabled>
+                        Select model
+                      </MenuItem>
                       {modelData.map((cur, idx) => (
                         <MenuItem value={cur} key={idx}>
                           {cur}
@@ -186,62 +248,77 @@ const VendorAddProductModal = () => {
                       ))}
                     </TextField>
                   )}
-                ></Controller>
+                />
 
-                <TextField id="title" label="title" {...register("title")} />
+                <TextField id="title" label="Title" {...register("title")} />
+
                 <TextField
                   id="base_package"
-                  label="base_package"
+                  label="Base Package"
                   {...register("base_package")}
                 />
+
                 <TextField
                   id="price"
                   type="number"
                   label="Price"
-                  {...register("price")}
+                  {...register("price", { valueAsNumber: true })}
                 />
 
                 <TextField
                   required
                   id="year_made"
                   type="number"
-                  label="year_made"
-                  {...register("year_made")}
+                  label="Year Made"
+                  {...register("year_made", {
+                    required: true,
+                    min: { value: 1900, message: "Year too old" },
+                    max: { value: 2100, message: "Invalid year" },
+                  })}
                 />
+
                 <Controller
                   control={control}
                   name="fuelType"
-                  render={({ field }) => (
+                  rules={{ required: "Fuel type is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="fuel_type"
                       select
-                      label="Fuel type"
-                      error={Boolean(field.value == "")}
+                      label="Fuel Type"
+                      error={!!error}
+                      helperText={error?.message}
                     >
-                      <MenuItem value={"petrol"}>petrol</MenuItem>
-                      <MenuItem value={"diesel"}>diesel</MenuItem>
-                      <MenuItem value={"electirc"}>electric</MenuItem>
-                      <MenuItem value={"hybrid"}>hybrid</MenuItem>
+                      <MenuItem value="" disabled>
+                        Select fuel type
+                      </MenuItem>
+                      <MenuItem value="petrol">Petrol</MenuItem>
+                      <MenuItem value="diesel">Diesel</MenuItem>
+                      <MenuItem value="electric">Electric</MenuItem>
+                      <MenuItem value="hybrid">Hybrid</MenuItem>
                     </TextField>
                   )}
-                ></Controller>
+                />
               </div>
 
               <div>
                 <Controller
                   name="carType"
                   control={control}
-                  render={({ field }) => (
+                  rules={{ required: "Car type is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="car_type"
                       select
                       label="Car Type"
-                      error={Boolean(field.value === "")} // Add error handling for empty value
+                      error={!!error}
+                      helperText={error?.message}
                     >
+                      <MenuItem value="" disabled>
+                        Select car type
+                      </MenuItem>
                       <MenuItem value="sedan">Sedan</MenuItem>
                       <MenuItem value="suv">SUV</MenuItem>
                       <MenuItem value="hatchback">Hatchback</MenuItem>
@@ -252,52 +329,63 @@ const VendorAddProductModal = () => {
                 <Controller
                   control={control}
                   name="Seats"
-                  render={({ field }) => (
+                  rules={{ required: "Number of seats is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="seats"
                       select
                       label="Seats"
-                      error={Boolean(field.value === "")}
+                      error={!!error}
+                      helperText={error?.message}
                     >
-                      <MenuItem value={"5"}>5</MenuItem>
-                      <MenuItem value={"7"}>7</MenuItem>
-                      <MenuItem value={"8"}>8</MenuItem>
+                      <MenuItem value="" disabled>
+                        Select seats
+                      </MenuItem>
+                      <MenuItem value="5">5</MenuItem>
+                      <MenuItem value="7">7</MenuItem>
+                      <MenuItem value="8">8</MenuItem>
                     </TextField>
                   )}
-                ></Controller>
+                />
 
                 <Controller
                   control={control}
                   name="transmitionType"
-                  render={({ field }) => (
+                  rules={{ required: "Transmission type is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="transmittion_type"
                       select
-                      label="transmittion_type"
-                      error={Boolean(field.value == "")}
+                      label="Transmission Type"
+                      error={!!error}
+                      helperText={error?.message}
                     >
-                      <MenuItem value={"automatic"}>automatic</MenuItem>
-                      <MenuItem value={"manual"}>manual</MenuItem>
+                      <MenuItem value="" disabled>
+                        Select transmission
+                      </MenuItem>
+                      <MenuItem value="automatic">Automatic</MenuItem>
+                      <MenuItem value="manual">Manual</MenuItem>
                     </TextField>
                   )}
-                ></Controller>
+                />
 
                 <Controller
                   control={control}
                   name="vehicleLocation"
-                  render={({ field }) => (
+                  rules={{ required: true }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="vehicleLocation"
                       select
-                      label="vehicleLocation"
-                      error={Boolean(field.value == "")}
+                      label="Location"
+                      error={!!error}
                     >
+                      <MenuItem value="" disabled>
+                        Select location
+                      </MenuItem>
                       {locationData.map((cur, idx) => (
                         <MenuItem value={cur} key={idx}>
                           {cur}
@@ -305,20 +393,23 @@ const VendorAddProductModal = () => {
                       ))}
                     </TextField>
                   )}
-                ></Controller>
+                />
 
                 <Controller
                   control={control}
                   name="vehicleDistrict"
-                  render={({ field }) => (
+                  rules={{ required: true }}
+                  render={({ field, fieldState: { error } }) => (
                     <TextField
                       {...field}
                       required
-                      id="vehicleDistrict"
                       select
-                      label="vehicleDistrict"
-                      error={Boolean(field.value == "")}
+                      label="District"
+                      error={!!error}
                     >
+                      <MenuItem value="" disabled>
+                        Select district
+                      </MenuItem>
                       {districtData.map((cur, idx) => (
                         <MenuItem value={cur} key={idx}>
                           {cur}
@@ -326,89 +417,102 @@ const VendorAddProductModal = () => {
                       ))}
                     </TextField>
                   )}
-                ></Controller>
+                />
 
                 <TextField
                   id="description"
-                  label="description"
+                  label="Description"
                   multiline
                   rows={4}
                   sx={{
                     width: "100%",
-                    "@media (min-width: 1280px)": {
-                      // for large screens (lg)
-                      minWidth: 565,
-                    },
+                    "@media (min-width: 1280px)": { minWidth: 565 },
                   }}
                   {...register("description")}
                 />
               </div>
+
               <div>
                 <Controller
                   name="insurance_end_date"
                   control={control}
-                  render={({ field }) => (
+                  rules={{ required: "Insurance expiry is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <DatePicker
                         {...field}
-                        label="Insurance end Date"
-                        inputFormat="MM/dd/yyyy" // Customize the date format as per your requirement
-                        value={field.value || null} // Ensure value is null if empty string or undefined
+                        label="Insurance End Date"
+                        value={field.value}
                         onChange={(date) => field.onChange(date)}
-                        textField={(props) => <TextField {...props} />}
+                        slotProps={{
+                          textField: {
+                            error: !!error,
+                            helperText: error?.message,
+                            required: true,
+                          },
+                        }}
                       />
                     </LocalizationProvider>
                   )}
                 />
 
                 <Controller
-                  control={control}
                   name="Registeration_end_date"
-                  render={({ field }) => (
+                  control={control}
+                  rules={{ required: "Registration expiry is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <DatePicker
                         {...field}
-                        label="registeration end Date"
-                        inputFormat="MM/dd/yyyy" // Customize the date format as per your requirement
-                        value={field.value || null} // Ensure value is null if empty string or undefined
+                        label="Registration End Date"
+                        value={field.value}
                         onChange={(date) => field.onChange(date)}
-                        textField={(props) => <TextField {...props} />}
+                        slotProps={{
+                          textField: {
+                            error: !!error,
+                            helperText: error?.message,
+                            required: true,
+                          },
+                        }}
                       />
                     </LocalizationProvider>
                   )}
-                ></Controller>
+                />
 
                 <Controller
-                  control={control}
                   name="polution_end_date"
-                  render={({ field }) => (
+                  control={control}
+                  rules={{ required: "Pollution expiry is required" }}
+                  render={({ field, fieldState: { error } }) => (
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <DatePicker
                         {...field}
-                        label="polution end Date "
-                        inputFormat="MM/dd/yyyy" // Customize the date format as per your requirement
-                        value={field.value || null} // Ensure value is null if empty string or undefined
+                        label="Pollution End Date"
+                        value={field.value}
                         onChange={(date) => field.onChange(date)}
-                        textField={(props) => <TextField {...props} />}
+                        slotProps={{
+                          textField: {
+                            error: !!error,
+                            helperText: error?.message,
+                            required: true,
+                          },
+                        }}
                       />
                     </LocalizationProvider>
                   )}
-                ></Controller>
+                />
 
-                {/* editing for image is not done yet , default value for image is also not done yet */}
-
-                {/* file upload section */}
-                <div className="flex flex-col items-start justify-center lg:flex-row gap-10 lg:justify-between lg:items-start   ml-7 mt-10">
+                {/* File uploads */}
+                <div className="flex flex-col items-start justify-center lg:flex-row gap-10 lg:justify-between lg:items-start ml-7 mt-10">
                   <div className="max-w-[300px] sm:max-w-[600px]">
                     <label
-                      className="block mb-2 text-sm font-medium text-gray-900 "
+                      className="block mb-2 text-sm font-medium text-gray-900"
                       htmlFor="insurance_image"
                     >
-                      Upload insurance image
+                      Upload Insurance Image
                     </label>
                     <input
-                      className="block w-full p-2 text-sm text-gray-50 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-black focus:outline-none dark:bg-gray-200 dark:border-gray-600 dark:placeholder-gray-400"
-                      aria-describedby="user_avatar_help"
+                      className="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
                       id="insurance_image"
                       type="file"
                       multiple
@@ -418,30 +522,29 @@ const VendorAddProductModal = () => {
 
                   <div className="max-w-[300px] sm:max-w-[600px]">
                     <label
-                      className="block mb-2 text-sm font-medium text-gray-900 "
+                      className="block mb-2 text-sm font-medium text-gray-900"
                       htmlFor="rc_book_image"
                     >
-                      Upload rc book image
+                      Upload RC Book Image
                     </label>
                     <input
-                      className="block w-full p-2  text-sm text-gray-50 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-black focus:outline-none dark:bg-gray-200 dark:border-gray-600 dark:placeholder-gray-400"
-                      aria-describedby="user_avatar_help"
+                      className="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
                       id="rc_book_image"
                       type="file"
                       multiple
                       {...register("rc_book_image")}
                     />
                   </div>
+
                   <div className="max-w-[300px] sm:max-w-[600px]">
                     <label
-                      className="block mb-2 text-sm font-medium text-gray-900 "
+                      className="block mb-2 text-sm font-medium text-gray-900"
                       htmlFor="polution_image"
                     >
-                      Upload polution image
+                      Upload Pollution Image
                     </label>
                     <input
-                      className="block w-full p-2 text-sm text-gray-50 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-black focus:outline-none dark:bg-gray-200 dark:border-gray-600 dark:placeholder-gray-900"
-                      aria-describedby="user_avatar_help"
+                      className="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
                       id="polution_image"
                       type="file"
                       multiple
@@ -451,14 +554,13 @@ const VendorAddProductModal = () => {
 
                   <div className="max-w-[300px] sm:max-w-[600px]">
                     <label
-                      className="block mb-2 text-sm font-medium text-gray-900 "
+                      className="block mb-2 text-sm font-medium text-gray-900"
                       htmlFor="image"
                     >
-                      Upload vehicle image
+                      Upload Vehicle Images
                     </label>
                     <input
-                      className="block w-full p-2 text-sm text-gray-50 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-black focus:outline-none dark:bg-gray-200 dark:border-gray-600 dark:placeholder-gray-900"
-                      aria-describedby="user_avatar_help"
+                      className="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
                       id="image"
                       type="file"
                       multiple
@@ -467,16 +569,20 @@ const VendorAddProductModal = () => {
                   </div>
                 </div>
               </div>
+
               <div className="mt-10 flex justify-start items-center ml-7 mb-10">
-                <Button variant="contained"  type="submit">
-                  Submit
+                <Button
+                  variant="contained"
+                  type="submit"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit"}
                 </Button>
               </div>
             </Box>
           </div>
         </form>
       </div>
-      )}
     </>
   );
 };
