@@ -20,38 +20,43 @@ export const allBookings = async (req, res, next) => {
       },
     ]);
 
+    // If bookings is falsy (e.g., null or undefined), treat as not found
     if (!bookings) {
-      next(errorHandler(404, "no bookings found"));
+      return next(errorHandler(404, "No bookings found"));
     }
 
     res.status(200).json(bookings);
   } catch (error) {
     console.log(error);
-    next(errorHandler(500, "error in allBookings"));
+    return next(errorHandler(500, "Error in allBookings"));
   }
 };
 
-//chnage bookings status
-
+// Change booking status
 export const changeStatus = async (req, res, next) => {
   try {
-    if (!req.body) {
-      next(errorHandler(409, "bad request vehicle id and new status needed"));
-      return;
-    }
+    // Validate required fields
     const { id, status } = req.body;
+    if (!id || !status) {
+      return next(
+        errorHandler(
+          409,
+          "Bad request: vehicle id and new status are required",
+        ),
+      );
+    }
 
     const statusChanged = await Booking.findByIdAndUpdate(id, {
       status: status,
     });
 
     if (!statusChanged) {
-      next(errorHandler(404, "status not changed or wrong id"));
-      return;
+      return next(errorHandler(404, "Status not changed or wrong id"));
     }
-    res.status(200).json({ message: "status changed" });
+
+    res.status(200).json({ message: "Status changed" });
   } catch (error) {
     console.log(error);
-    next(errorHandler(500, "error in changeStatus"));
+    return next(errorHandler(500, "Error in changeStatus"));
   }
 };
